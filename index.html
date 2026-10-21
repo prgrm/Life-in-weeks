@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Your life in weeks</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&display=swap" rel="stylesheet">
+<style>
+:root{color-scheme:dark;--bg:#151826;--panel:#1d2133;--line:#2d3350;--text:#e8e6f2;--muted:#9096b3;--empty:#2e3453;--accent:#8fb4ff;--serif:'Fraunces',Georgia,serif;--sans:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:15px/1.5 var(--sans)}
+.wrap{max-width:1180px;margin:0 auto;padding:24px 16px 48px}
+h1{font:700 clamp(28px,5vw,44px)/1.1 var(--serif);margin:0 0 6px}
+h2{font:500 18px/1.2 var(--serif);margin:0 0 12px}
+.sub{color:var(--muted);margin:0 0 24px}
+.layout{display:grid;gap:24px}
+.side{order:-1}
+@media(min-width:960px){.layout{grid-template-columns:minmax(0,1fr) 340px;align-items:start}.side{order:0;position:sticky;top:16px;max-height:calc(100vh - 32px);overflow:auto}}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px;margin-bottom:16px}
+label{display:block;font-size:13px;color:var(--muted);margin-bottom:4px}
+input,select,button{font:inherit;color:var(--text);background:#262b44;border:1px solid var(--line);border-radius:6px;padding:7px 9px;min-width:0}
+input[type=color]{padding:2px;width:38px;height:34px;flex:none;cursor:pointer}
+button{cursor:pointer}
+button:hover{border-color:var(--accent)}
+.primary{background:var(--accent);color:#10142a;border-color:var(--accent);font-weight:600}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.line{display:flex;gap:8px;align-items:center;margin-bottom:8px}
+.line input[type=text],.line input[type=date],.line input[type=number]{flex:1}
+.item+.item{border-top:1px solid var(--line);padding-top:10px;margin-top:10px}
+.x{padding:6px 10px;color:var(--muted)}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.empty,.note{color:var(--muted);margin:0 0 10px;font-size:14px}
+.btns{display:flex;gap:8px;flex-wrap:wrap}
+.info{min-height:3em;margin:0 0 12px}
+.stat{color:var(--muted);font-size:13px}
+.scroller{overflow-x:auto;padding-bottom:6px}
+.grid{min-width:440px;display:flex;flex-direction:column;gap:2px}
+.row{display:flex;align-items:center;gap:6px}
+.age{width:22px;flex:none;text-align:right;font-size:10px;color:var(--muted)}
+.weeks{flex:1;display:grid;grid-template-columns:repeat(52,1fr);gap:2px}
+.w{display:block;aspect-ratio:1;border-radius:1.5px;background:var(--empty)}
+.w.f{opacity:.35}
+.w.now{background:var(--text);outline:2px solid var(--accent);outline-offset:1px;position:relative;z-index:1}
+.w.e{border-radius:50%;transform:scale(1.3);position:relative;z-index:1}
+.w.f.e{opacity:.85}
+@media(max-width:600px){.grid,.weeks{gap:1px}}
+.legend{display:flex;flex-wrap:wrap;gap:6px 16px;margin-top:16px;color:var(--muted);font-size:13px}
+.sw{display:inline-block;width:11px;height:11px;border-radius:2px;margin-right:6px;vertical-align:-1px}
+.sw.c{border-radius:50%}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Your life in weeks</h1>
+  <p class="sub">Each square is one week. Each row is one year of life.</p>
+  <div class="layout">
+    <main>
+      <p class="info" id="info" aria-live="polite">Hover or tap a square to see its dates.</p>
+      <div class="scroller"><div class="grid" id="grid"></div></div>
+      <div class="legend" id="legend"></div>
+      <p class="stat" id="stat"></p>
+    </main>
+    <aside class="side">
+      <section class="panel">
+        <h2>About you</h2>
+        <div class="two">
+          <div><label for="birth">Birth date</label><input type="date" id="birth" min="1900-01-01"></div>
+          <div><label for="years">Years to show</label><input type="number" id="years" min="1" max="120" step="1"></div>
+        </div>
+      </section>
+      <section class="panel">
+        <h2>Life phases</h2>
+        <div id="phases"></div>
+        <button type="button" id="addPhase">Add phase</button>
+      </section>
+      <section class="panel">
+        <h2>Major events</h2>
+        <div id="events"></div>
+        <button type="button" id="addEvent">Add event</button>
+      </section>
+      <section class="panel">
+        <h2>Share as an image</h2>
+        <p class="note">Creates a tall infographic of your grid, sized for social media and WhatsApp.</p>
+        <div class="btns">
+          <button type="button" class="primary" id="imgDownload">Download image</button>
+          <button type="button" id="imgShare" hidden>Share image</button>
+        </div>
+        <p class="note" id="imgMsg" role="status" style="margin-top:10px"></p>
+      </section>
+      <section class="panel">
+        <h2>Save and load</h2>
+        <p class="note">Your information stays in this browser. Export a text file to keep it or move it to another device.</p>
+        <div class="btns">
+          <button type="button" class="primary" id="export">Export file</button>
+          <button type="button" id="importBtn">Import file</button>
+          <input type="file" id="import" accept=".txt,text/plain" hidden>
+        </div>
+        <p class="note" id="msg" role="status" style="margin-top:10px"></p>
+      </section>
+    </aside>
+  </div>
+</div>
+<script>
+const $=s=>document.querySelector(s),DAY=864e5,DRE=/^\d{4}-\d{2}-\d{2}$/;
+const PAL=['#6ea8ff','#f0b45a','#6fcf9f','#e27a9b','#a58be0','#4fc3d1'];
+let S={version:1,birthDate:'',years:90,phases:[],events:[]},R=[],EV=new Map();
+
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const parse=s=>DRE.test(s)?s.split('-').map((v,i)=>i===1?+v-1:+v):null;
+const bd=(b,r)=>Date.UTC(b[0]+r,b[1],b[2]);
+const fmt=ms=>new Date(ms).toLocaleDateString(undefined,{timeZone:'UTC',dateStyle:'medium'});
+const hit=(x,b,r,c)=>{const st=bd(b,r)+c*7*DAY,en=c===51?bd(b,r+1):st+7*DAY;return st<x.e&&en>x.s};
+
+function norm(o){
+  if(!o||typeof o!=='object')throw new Error('bad file');
+  const hex=c=>/^#[0-9a-f]{6}$/i.test(c)?c:PAL[0];
+  return{version:1,
+    birthDate:DRE.test(o.birthDate)?o.birthDate:'',
+    years:Math.min(120,Math.max(1,parseInt(o.years)||90)),
+    phases:(Array.isArray(o.phases)?o.phases:[]).map(p=>({name:String(p.name||'').slice(0,60),color:hex(p.color),mode:p.mode==='ages'?'ages':'dates',start:String(p.start??'').slice(0,10),end:String(p.end??'').slice(0,10)})),
+    events:(Array.isArray(o.events)?o.events:[]).map(e=>({name:String(e.name||'').slice(0,60),color:hex(e.color),date:DRE.test(e.date)?e.date:''}))};
+}
+function save(){try{localStorage.setItem('life-in-weeks',JSON.stringify(S))}catch(e){}}
+
+function ranges(b){
+  return S.phases.map(p=>{
+    let s,e;
+    if(p.mode==='ages'){const a=parseInt(p.start),z=parseInt(p.end);if(isNaN(a))return null;s=bd(b,a);e=isNaN(z)?Infinity:bd(b,z)}
+    else{const a=parse(p.start),z=parse(p.end);if(!a)return null;s=Date.UTC(...a);e=z?Date.UTC(...z)+DAY:Infinity}
+    return{p,s,e};
+  }).filter(Boolean);
+}
+function pos(b,ds){
+  const d=parse(ds);if(!d)return null;
+  let r=d[0]-b[0];if(d[1]<b[1]||(d[1]===b[1]&&d[2]<b[2]))r--;
+  if(r<0||r>=S.years)return null;
+  return[r,Math.min(51,Math.floor((Date.UTC(...d)-bd(b,r))/(7*DAY)))];
+}
+
+function drawGrid(){
+  const b=parse(S.birthDate),now=Date.now();
+  R=b?ranges(b):[];EV=new Map();
+  if(b)S.events.forEach(ev=>{const q=pos(b,ev.date);if(q)EV.set(q[0]*52+q[1],ev)});
+  let h='',lived=0;
+  for(let r=0;r<S.years;r++){
+    h+=`<div class="row"><span class="age">${r%5===0?r:''}</span><div class="weeks">`;
+    for(let c=0;c<52;c++){
+      let cls='w',col='';
+      if(b){
+        const st=bd(b,r)+c*7*DAY,en=c===51?bd(b,r+1):st+7*DAY;
+        R.forEach(x=>{if(hit(x,b,r,c))col=x.p.color});
+        if(now<st)cls+=' f';else{lived++;if(now<en)cls+=' now'}
+      }
+      const ev=EV.get(r*52+c);if(ev){col=ev.color;cls+=' e'}
+      h+=`<i class="${cls}" data-r="${r}" data-c="${c}"${col?` style="background:${col}"`:''}></i>`;
+    }
+    h+='</div></div>';
+  }
+  $('#grid').innerHTML=h;
+  const lg=[];
+  S.phases.filter(p=>p.name.trim()).forEach(p=>lg.push(`<span><span class="sw" style="background:${p.color}"></span>${esc(p.name)}</span>`));
+  S.events.filter(e=>e.name.trim()).forEach(e=>lg.push(`<span><span class="sw c" style="background:${e.color}"></span>${esc(e.name)}${e.date?' ('+esc(fmt(Date.UTC(...parse(e.date))))+')':''}</span>`));
+  lg.push('<span><span class="sw" style="background:var(--text);outline:2px solid var(--accent)"></span>This week</span>');
+  $('#legend').innerHTML=lg.join('');
+  $('#stat').textContent=b?`${lived.toLocaleString()} of ${(S.years*52).toLocaleString()} weeks lived (${Math.min(100,Math.round(lived/(S.years*52)*100))}%).`:'Enter your birth date to see weeks lived and to color phases and events.';
+}
+
+function drawForm(){
+  $('#phases').innerHTML=S.phases.map((p,i)=>{
+    const t=p.mode==='ages'?'number" min="0" max="120" step="1':'date';
+    return `<div class="item" data-k="phases" data-i="${i}">
+      <div class="line"><input type="color" data-f="color" value="${p.color}" aria-label="Phase color"><input type="text" data-f="name" value="${esc(p.name)}" placeholder="Phase name" aria-label="Phase name"><button type="button" class="x" data-del aria-label="Remove phase">✕</button></div>
+      <div class="line"><select data-f="mode" aria-label="Define phase by"><option value="dates"${p.mode==='dates'?' selected':''}>Dates</option><option value="ages"${p.mode==='ages'?' selected':''}>Ages</option></select>
+      <input type="${t}" data-f="start" value="${esc(p.start)}" aria-label="Phase start"><span>to</span><input type="${t}" data-f="end" value="${esc(p.end)}" aria-label="Phase end"></div></div>`}).join('')
+    ||'<p class="empty">No phases yet. Add one for school, a job, a city you lived in.</p>';
+  $('#events').innerHTML=S.events.map((v,i)=>`<div class="item" data-k="events" data-i="${i}">
+      <div class="line"><input type="color" data-f="color" value="${v.color}" aria-label="Event color"><input type="text" data-f="name" value="${esc(v.name)}" placeholder="Event name" aria-label="Event name"><button type="button" class="x" data-del aria-label="Remove event">✕</button></div>
+      <div class="line"><input type="date" data-f="date" value="${esc(v.date)}" aria-label="Event date"></div></div>`).join('')
+    ||'<p class="empty">No events yet. Add a move, a graduation, a wedding.</p>';
+}
+function sync(){$('#birth').value=S.birthDate;$('#years').value=S.years;drawForm();drawGrid();save()}
+
+document.addEventListener('input',e=>{
+  const f=e.target.dataset.f,it=e.target.closest('.item');
+  if(!f||!it)return;
+  const o=S[it.dataset.k][+it.dataset.i];o[f]=e.target.value;
+  if(f==='mode'){o.start=o.end='';drawForm()}
+  drawGrid();save();
+});
+document.addEventListener('click',e=>{
+  const it=e.target.closest('.item');
+  if(e.target.closest('[data-del]')&&it){S[it.dataset.k].splice(+it.dataset.i,1);drawForm();drawGrid();save()}
+});
+$('#addPhase').onclick=()=>{S.phases.push({name:'',color:PAL[S.phases.length%PAL.length],mode:'dates',start:'',end:''});drawForm();save()};
+$('#addEvent').onclick=()=>{S.events.push({name:'',color:PAL[(S.events.length+3)%PAL.length],date:''});drawForm();save()};
+$('#birth').oninput=e=>{S.birthDate=DRE.test(e.target.value)?e.target.value:'';drawGrid();save()};
+$('#years').oninput=e=>{const n=parseInt(e.target.value);if(n>=1&&n<=120){S.years=n;drawGrid();save()}};
+
+function info(e){
+  const t=e.target.closest('.w');if(!t)return;
+  const r=+t.dataset.r,c=+t.dataset.c,b=parse(S.birthDate);
+  let s=`Age ${r}, week ${c+1}`;
+  if(b){
+    s+=` · week of ${fmt(bd(b,r)+c*7*DAY)}`;
+    const ph=R.filter(x=>hit(x,b,r,c)).pop();
+    if(ph)s+=` · ${ph.p.name||'Unnamed phase'}`;
+    const ev=EV.get(r*52+c);if(ev)s+=` · ${ev.name||'Unnamed event'}`;
+  }
+  $('#info').textContent=s;
+}
+$('#grid').addEventListener('mouseover',info);
+$('#grid').addEventListener('click',info);
+
+$('#export').onclick=()=>{
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([JSON.stringify(S,null,2)],{type:'text/plain'}));
+  a.download='life-in-weeks.txt';document.body.appendChild(a);a.click();a.remove();
+  setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+  $('#msg').textContent='Exported life-in-weeks.txt.';
+};
+$('#importBtn').onclick=()=>$('#import').click();
+$('#import').onchange=async e=>{
+  const f=e.target.files[0];if(!f)return;
+  try{S=norm(JSON.parse(await f.text()));sync();$('#msg').textContent=`Imported ${f.name}.`}
+  catch(err){$('#msg').textContent='That file couldn’t be read. Choose a .txt file exported from this site.'}
+  e.target.value='';
+};
+
+async function makeImage(){
+  const b=parse(S.birthDate);
+  try{await document.fonts.load('700 64px Fraunces')}catch(e){}
+  const W=1080,P=56,LW=36,gx=P+LW,pitch=(W-P*2-LW)/52,sq=pitch*.78,top=250;
+  const SERIF='Fraunces,Georgia,serif',SANS="system-ui,-apple-system,'Segoe UI',Roboto,sans-serif";
+  const cv=document.createElement('canvas'),x=cv.getContext('2d');
+  const items=[];
+  S.phases.filter(p=>p.name.trim()).forEach(p=>items.push({n:p.name.trim(),c:p.color}));
+  S.events.filter(e=>e.name.trim()).forEach(e=>items.push({n:e.name.trim()+(e.date?' ('+fmt(Date.UTC(...parse(e.date)))+')':''),c:e.color,round:1}));
+  items.push({n:'This week',c:'#e8e6f2',now:1});
+  x.font='22px '+SANS;
+  let lx=P,L=0;
+  items.forEach(it=>{const w=30+x.measureText(it.n).width;if(lx+w>W-P&&lx>P){lx=P;L++}it.x=lx;it.l=L;lx+=w+26});
+  const legY=top+S.years*pitch+56,H=Math.round(legY+L*40+60);
+  cv.width=W;cv.height=H;
+  const box=(px,py,s,rad)=>{x.beginPath();if(x.roundRect)x.roundRect(px,py,s,s,rad);else x.rect(px,py,s,s);x.fill()};
+  const dot=(px,py,rad)=>{x.beginPath();x.arc(px,py,rad,0,Math.PI*2);x.fill()};
+  x.fillStyle='#151826';x.fillRect(0,0,W,H);
+  const now=Date.now();let lived=0,cur=null;
+  x.textAlign='right';x.font='13px '+SANS;
+  for(let r=0;r<S.years;r++){
+    const y=top+r*pitch;
+    if(r%5===0){x.globalAlpha=1;x.fillStyle='#9096b3';x.fillText(r,gx-10,y+sq)}
+    for(let c=0;c<52;c++){
+      const st=bd(b,r)+c*7*DAY,en=c===51?bd(b,r+1):st+7*DAY,fut=now<st;
+      let col='#2e3453';
+      R.forEach(z=>{if(hit(z,b,r,c))col=z.p.color});
+      if(!fut){lived++;if(now<en){cur=[r,c];if(col==='#2e3453')col='#e8e6f2'}}
+      x.globalAlpha=fut?.35:1;x.fillStyle=col;box(gx+c*pitch,y,sq,1.5);
+    }
+  }
+  EV.forEach((ev,k)=>{
+    const r=Math.floor(k/52),c=k%52;
+    x.globalAlpha=bd(b,r)+c*7*DAY>now?.85:1;x.fillStyle=ev.color;
+    dot(gx+c*pitch+sq/2,top+r*pitch+sq/2,sq*.65);
+  });
+  x.globalAlpha=1;
+  if(cur){x.strokeStyle='#8fb4ff';x.lineWidth=2.5;x.strokeRect(gx+cur[1]*pitch-2,top+cur[0]*pitch-2,sq+4,sq+4)}
+  x.textAlign='left';
+  x.fillStyle='#e8e6f2';x.font='700 64px '+SERIF;x.fillText('My life in weeks',P,112);
+  x.fillStyle='#9096b3';x.font='26px '+SANS;
+  x.fillText(`${lived.toLocaleString()} of ${(S.years*52).toLocaleString()} weeks lived (${Math.min(100,Math.round(lived/(S.years*52)*100))}%)`,P,164);
+  x.font='20px '+SANS;x.fillText('Each square is one week. Each row is one year.',P,200);
+  x.font='22px '+SANS;
+  items.forEach(it=>{
+    const y=legY+it.l*40;x.fillStyle=it.c;
+    if(it.round)dot(it.x+9,y-7,9);else box(it.x,y-16,18,3);
+    if(it.now){x.strokeStyle='#8fb4ff';x.lineWidth=2;x.strokeRect(it.x-1.5,y-17.5,21,21)}
+    x.fillStyle='#c9c7da';x.fillText(it.n,it.x+30,y);
+  });
+  return cv;
+}
+async function imgAction(share){
+  const m=$('#imgMsg');
+  if(!parse(S.birthDate)){m.textContent='Enter your birth date first.';return}
+  m.textContent='Creating image…';
+  try{
+    const blob=await new Promise(res=>makeImage().then(cv=>cv.toBlob(res,'image/png')));
+    if(!blob)throw new Error('blob');
+    const file=new File([blob],'my-life-in-weeks.png',{type:'image/png'});
+    if(share){await navigator.share({files:[file],title:'My life in weeks'});m.textContent=''}
+    else{
+      const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=file.name;
+      document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+      m.textContent='Saved my-life-in-weeks.png.';
+    }
+  }catch(err){m.textContent=err&&err.name==='AbortError'?'':'Couldn’t create the image. Try again.'}
+}
+$('#imgDownload').onclick=()=>imgAction(0);
+$('#imgShare').onclick=()=>imgAction(1);
+try{if(navigator.canShare&&navigator.canShare({files:[new File([''],'a.png',{type:'image/png'})]}))$('#imgShare').hidden=false}catch(e){}
+
+$('#birth').max=new Date().toISOString().slice(0,10);
+try{const t=localStorage.getItem('life-in-weeks');if(t)S=norm(JSON.parse(t))}catch(e){}
+sync();
+</script>
+</body>
+</html>

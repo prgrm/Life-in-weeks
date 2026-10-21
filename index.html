@@ -2,13 +2,14 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Your life in weeks</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&display=swap" rel="stylesheet">
 <style>
 :root{color-scheme:dark;--bg:#151826;--panel:#1d2133;--line:#2d3350;--text:#e8e6f2;--muted:#9096b3;--empty:#2e3453;--accent:#8fb4ff;--serif:'Fraunces',Georgia,serif;--sans:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif}
 *{box-sizing:border-box}
+:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
 body{margin:0;background:var(--bg);color:var(--text);font:15px/1.5 var(--sans)}
 .wrap{max-width:1180px;margin:0 auto;padding:24px 16px 48px}
 h1{font:700 clamp(28px,5vw,44px)/1.1 var(--serif);margin:0 0 6px}
@@ -110,6 +111,7 @@ const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'
 const parse=s=>DRE.test(s)?s.split('-').map((v,i)=>i===1?+v-1:+v):null;
 const bd=(b,r)=>Date.UTC(b[0]+r,b[1],b[2]);
 const fmt=ms=>new Date(ms).toLocaleDateString(undefined,{timeZone:'UTC',dateStyle:'medium'});
+const evLabel=e=>{const d=parse(e.date),n=e.weeks||1;return[d?fmt(Date.UTC(...d)):'',n>1?n+' weeks':''].filter(Boolean).join(', ')};
 const hit=(x,b,r,c)=>{const st=bd(b,r)+c*7*DAY,en=c===51?bd(b,r+1):st+7*DAY;return st<x.e&&en>x.s};
 
 function norm(o){
@@ -119,7 +121,7 @@ function norm(o){
     birthDate:DRE.test(o.birthDate)?o.birthDate:'',
     years:Math.min(120,Math.max(1,parseInt(o.years)||90)),
     phases:(Array.isArray(o.phases)?o.phases:[]).map(p=>({name:String(p.name||'').slice(0,60),color:hex(p.color),mode:p.mode==='ages'?'ages':'dates',start:String(p.start??'').slice(0,10),end:String(p.end??'').slice(0,10)})),
-    events:(Array.isArray(o.events)?o.events:[]).map(e=>({name:String(e.name||'').slice(0,60),color:hex(e.color),date:DRE.test(e.date)?e.date:''}))};
+    events:(Array.isArray(o.events)?o.events:[]).map(e=>({name:String(e.name||'').slice(0,60),color:hex(e.color),date:DRE.test(e.date)?e.date:'',weeks:Math.min(520,Math.max(1,parseInt(e.weeks)||1))}))};
 }
 function save(){try{localStorage.setItem('life-in-weeks',JSON.stringify(S))}catch(e){}}
 
@@ -141,7 +143,7 @@ function pos(b,ds){
 function drawGrid(){
   const b=parse(S.birthDate),now=Date.now();
   R=b?ranges(b):[];EV=new Map();
-  if(b)S.events.forEach(ev=>{const q=pos(b,ev.date);if(q)EV.set(q[0]*52+q[1],ev)});
+  if(b)S.events.forEach(ev=>{const q=pos(b,ev.date);if(q)for(let k=q[0]*52+q[1],n=ev.weeks||1,i=0;i<n&&k+i<S.years*52;i++)EV.set(k+i,ev)});
   let h='',lived=0;
   for(let r=0;r<S.years;r++){
     h+=`<div class="row"><span class="age">${r%5===0?r:''}</span><div class="weeks">`;
@@ -160,7 +162,7 @@ function drawGrid(){
   $('#grid').innerHTML=h;
   const lg=[];
   S.phases.filter(p=>p.name.trim()).forEach(p=>lg.push(`<span><span class="sw" style="background:${p.color}"></span>${esc(p.name)}</span>`));
-  S.events.filter(e=>e.name.trim()).forEach(e=>lg.push(`<span><span class="sw c" style="background:${e.color}"></span>${esc(e.name)}${e.date?' ('+esc(fmt(Date.UTC(...parse(e.date))))+')':''}</span>`));
+  S.events.filter(e=>e.name.trim()).forEach(e=>lg.push(`<span><span class="sw c" style="background:${e.color}"></span>${esc(e.name)}${evLabel(e)?' ('+esc(evLabel(e))+')':''}</span>`));
   lg.push('<span><span class="sw" style="background:var(--text);outline:2px solid var(--accent)"></span>This week</span>');
   $('#legend').innerHTML=lg.join('');
   $('#stat').textContent=b?`${lived.toLocaleString()} of ${(S.years*52).toLocaleString()} weeks lived (${Math.min(100,Math.round(lived/(S.years*52)*100))}%).`:'Enter your birth date to see weeks lived and to color phases and events.';
@@ -176,7 +178,7 @@ function drawForm(){
     ||'<p class="empty">No phases yet. Add one for school, a job, a city you lived in.</p>';
   $('#events').innerHTML=S.events.map((v,i)=>`<div class="item" data-k="events" data-i="${i}">
       <div class="line"><input type="color" data-f="color" value="${v.color}" aria-label="Event color"><input type="text" data-f="name" value="${esc(v.name)}" placeholder="Event name" aria-label="Event name"><button type="button" class="x" data-del aria-label="Remove event">✕</button></div>
-      <div class="line"><input type="date" data-f="date" value="${esc(v.date)}" aria-label="Event date"></div></div>`).join('')
+      <div class="line"><input type="date" data-f="date" value="${esc(v.date)}" aria-label="Event date"><input type="number" data-f="weeks" value="${v.weeks||1}" min="1" max="520" step="1" style="flex:0 0 76px" aria-label="Weeks to mark"><span>weeks</span></div></div>`).join('')
     ||'<p class="empty">No events yet. Add a move, a graduation, a wedding.</p>';
 }
 function sync(){$('#birth').value=S.birthDate;$('#years').value=S.years;drawForm();drawGrid();save()}
@@ -184,7 +186,7 @@ function sync(){$('#birth').value=S.birthDate;$('#years').value=S.years;drawForm
 document.addEventListener('input',e=>{
   const f=e.target.dataset.f,it=e.target.closest('.item');
   if(!f||!it)return;
-  const o=S[it.dataset.k][+it.dataset.i];o[f]=e.target.value;
+  const o=S[it.dataset.k][+it.dataset.i];o[f]=f==='weeks'?Math.min(520,Math.max(1,parseInt(e.target.value)||1)):e.target.value;
   if(f==='mode'){o.start=o.end='';drawForm()}
   drawGrid();save();
 });
@@ -193,7 +195,7 @@ document.addEventListener('click',e=>{
   if(e.target.closest('[data-del]')&&it){S[it.dataset.k].splice(+it.dataset.i,1);drawForm();drawGrid();save()}
 });
 $('#addPhase').onclick=()=>{S.phases.push({name:'',color:PAL[S.phases.length%PAL.length],mode:'dates',start:'',end:''});drawForm();save()};
-$('#addEvent').onclick=()=>{S.events.push({name:'',color:PAL[(S.events.length+3)%PAL.length],date:''});drawForm();save()};
+$('#addEvent').onclick=()=>{S.events.push({name:'',color:PAL[(S.events.length+3)%PAL.length],date:'',weeks:1});drawForm();save()};
 $('#birth').oninput=e=>{S.birthDate=DRE.test(e.target.value)?e.target.value:'';drawGrid();save()};
 $('#years').oninput=e=>{const n=parseInt(e.target.value);if(n>=1&&n<=120){S.years=n;drawGrid();save()}};
 
@@ -212,12 +214,18 @@ function info(e){
 $('#grid').addEventListener('mouseover',info);
 $('#grid').addEventListener('click',info);
 
-$('#export').onclick=()=>{
-  const a=document.createElement('a');
-  a.href=URL.createObjectURL(new Blob([JSON.stringify(S,null,2)],{type:'text/plain'}));
-  a.download='life-in-weeks.txt';document.body.appendChild(a);a.click();a.remove();
-  setTimeout(()=>URL.revokeObjectURL(a.href),1000);
-  $('#msg').textContent='Exported life-in-weeks.txt.';
+async function saveFile(name,blob){
+  let d=null;
+  try{if(window.claude&&window.claude.use)d=await window.claude.use('downloads')}catch(e){}
+  if(d){await d.save({filename:name,data:blob});return}
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;
+  document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+}
+$('#export').onclick=async()=>{
+  try{
+    await saveFile('life-in-weeks.txt',new Blob([JSON.stringify(S,null,2)],{type:'text/plain'}));
+    $('#msg').textContent='Exported life-in-weeks.txt.';
+  }catch(err){$('#msg').textContent=err&&err.code==='declined'?'':'Couldn’t export the file. Try again.'}
 };
 $('#importBtn').onclick=()=>$('#import').click();
 $('#import').onchange=async e=>{
@@ -235,7 +243,7 @@ async function makeImage(){
   const cv=document.createElement('canvas'),x=cv.getContext('2d');
   const items=[];
   S.phases.filter(p=>p.name.trim()).forEach(p=>items.push({n:p.name.trim(),c:p.color}));
-  S.events.filter(e=>e.name.trim()).forEach(e=>items.push({n:e.name.trim()+(e.date?' ('+fmt(Date.UTC(...parse(e.date)))+')':''),c:e.color,round:1}));
+  S.events.filter(e=>e.name.trim()).forEach(e=>items.push({n:e.name.trim()+(evLabel(e)?' ('+evLabel(e)+')':''),c:e.color,round:1}));
   items.push({n:'This week',c:'#e8e6f2',now:1});
   x.font='22px '+SANS;
   let lx=P,L=0;
@@ -288,16 +296,12 @@ async function imgAction(share){
     if(!blob)throw new Error('blob');
     const file=new File([blob],'my-life-in-weeks.png',{type:'image/png'});
     if(share){await navigator.share({files:[file],title:'My life in weeks'});m.textContent=''}
-    else{
-      const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=file.name;
-      document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),1000);
-      m.textContent='Saved my-life-in-weeks.png.';
-    }
-  }catch(err){m.textContent=err&&err.name==='AbortError'?'':'Couldn’t create the image. Try again.'}
+    else{await saveFile(file.name,blob);m.textContent='Saved my-life-in-weeks.png.'}
+  }catch(err){m.textContent=err&&(err.name==='AbortError'||err.code==='declined')?'':'Couldn’t create the image. Try again.'}
 }
 $('#imgDownload').onclick=()=>imgAction(0);
 $('#imgShare').onclick=()=>imgAction(1);
-try{if(navigator.canShare&&navigator.canShare({files:[new File([''],'a.png',{type:'image/png'})]}))$('#imgShare').hidden=false}catch(e){}
+try{if(!window.claude&&navigator.canShare&&navigator.canShare({files:[new File([''],'a.png',{type:'image/png'})]}))$('#imgShare').hidden=false}catch(e){}
 
 $('#birth').max=new Date().toISOString().slice(0,10);
 try{const t=localStorage.getItem('life-in-weeks');if(t)S=norm(JSON.parse(t))}catch(e){}
@@ -305,3 +309,4 @@ sync();
 </script>
 </body>
 </html>
+ 

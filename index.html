@@ -36,7 +36,7 @@ button:hover{border-color:var(--accent)}
 .info{min-height:3em;margin:0 0 12px}
 .stat{color:var(--muted);font-size:13px}
 .scroller{overflow-x:auto;padding-bottom:6px}
-.grid{min-width:440px;display:flex;flex-direction:column;gap:2px}
+.grid{min-width:440px;display:flex;flex-direction:column;gap:2px;position:relative;padding-top:18px}
 .row{display:flex;align-items:center;gap:6px}
 .age{width:22px;flex:none;text-align:right;font-size:10px;color:var(--muted)}
 .weeks{flex:1;display:grid;grid-template-columns:repeat(52,1fr);gap:2px}
@@ -49,6 +49,9 @@ button:hover{border-color:var(--accent)}
 .legend{display:flex;flex-wrap:wrap;gap:6px 16px;margin-top:16px;color:var(--muted);font-size:13px}
 .sw{display:inline-block;width:11px;height:11px;border-radius:2px;margin-right:6px;vertical-align:-1px}
 .sw.c{border-radius:50%}
+.lbl{position:absolute;left:0;top:0;z-index:2;pointer-events:none;white-space:nowrap;max-width:220px;overflow:hidden;text-overflow:ellipsis;font:600 11px/1.3 var(--sans);padding:1px 6px;background:rgba(21,24,38,.92);border-left:3px solid var(--accent);border-radius:3px;color:var(--text)}
+#tip{position:fixed;z-index:10;pointer-events:none;white-space:pre-line;max-width:260px;background:#0f1220;border:1px solid var(--line);border-radius:6px;padding:6px 10px;font-size:13px;line-height:1.4;box-shadow:0 4px 14px rgba(0,0,0,.45)}
+#tip[hidden]{display:none}
 </style>
 </head>
 <body>
@@ -102,6 +105,7 @@ button:hover{border-color:var(--accent)}
     </aside>
   </div>
 </div>
+<div id="tip" role="tooltip" hidden></div>
 <script>
 const $=s=>document.querySelector(s),DAY=864e5,DRE=/^\d{4}-\d{2}-\d{2}$/;
 const PAL=['#6ea8ff','#f0b45a','#6fcf9f','#e27a9b','#a58be0','#4fc3d1'];
@@ -159,7 +163,7 @@ function drawGrid(){
     }
     h+='</div></div>';
   }
-  $('#grid').innerHTML=h;
+  $('#grid').innerHTML=h;placeLabels();
   const lg=[];
   S.phases.filter(p=>p.name.trim()).forEach(p=>lg.push(`<span><span class="sw" style="background:${p.color}"></span>${esc(p.name)}</span>`));
   S.events.filter(e=>e.name.trim()).forEach(e=>lg.push(`<span><span class="sw c" style="background:${e.color}"></span>${esc(e.name)}${evLabel(e)?' ('+esc(evLabel(e))+')':''}</span>`));
@@ -202,17 +206,45 @@ $('#years').oninput=e=>{const n=parseInt(e.target.value);if(n>=1&&n<=120){S.year
 function info(e){
   const t=e.target.closest('.w');if(!t)return;
   const r=+t.dataset.r,c=+t.dataset.c,b=parse(S.birthDate);
-  let s=`Age ${r}, week ${c+1}`;
+  const p=[`Week ${(r*52+c+1).toLocaleString()} from birth`,`Age ${r}`];
   if(b){
-    s+=` · week of ${fmt(bd(b,r)+c*7*DAY)}`;
+    p.push(`week of ${fmt(bd(b,r)+c*7*DAY)}`);
     const ph=R.filter(x=>hit(x,b,r,c)).pop();
-    if(ph)s+=` · ${ph.p.name||'Unnamed phase'}`;
-    const ev=EV.get(r*52+c);if(ev)s+=` · ${ev.name||'Unnamed event'}`;
+    if(ph)p.push(ph.p.name||'Unnamed phase');
+    const ev=EV.get(r*52+c);if(ev)p.push(ev.name||'Unnamed event');
   }
-  $('#info').textContent=s;
+  $('#info').textContent=p.join(' · ');
+  const tip=$('#tip');tip.textContent=p.join('\n');tip.hidden=false;
+  tipMove(e);
 }
+function tipMove(e){
+  const tip=$('#tip');if(tip.hidden)return;
+  let x=e.clientX+14,y=e.clientY+14;
+  if(x+tip.offsetWidth>innerWidth-8)x=e.clientX-tip.offsetWidth-14;
+  if(y+tip.offsetHeight>innerHeight-8)y=e.clientY-tip.offsetHeight-14;
+  tip.style.left=Math.max(4,x)+'px';tip.style.top=Math.max(4,y)+'px';
+}
+function placeLabels(){
+  const g=$('#grid');g.querySelectorAll('.lbl').forEach(n=>n.remove());
+  const gr=g.getBoundingClientRect(),seen=new Set();
+  EV.forEach((ev,k)=>{
+    if(seen.has(ev))return;seen.add(ev);
+    if(!ev.name.trim())return;
+    const sq=g.querySelector(`.w[data-r="${Math.floor(k/52)}"][data-c="${k%52}"]`);if(!sq)return;
+    const sr=sq.getBoundingClientRect(),l=document.createElement('span');
+    l.className='lbl';l.textContent=ev.name.trim();l.style.borderLeftColor=ev.color;
+    g.appendChild(l);
+    const w=l.offsetWidth,h=l.offsetHeight;
+    l.style.left=Math.max(0,Math.min(sr.left-gr.left+sr.width/2-w/2,g.clientWidth-w))+'px';
+    l.style.top=(sr.top-gr.top-h-3)+'px';
+  });
+}
+addEventListener('resize',()=>requestAnimationFrame(placeLabels));
 $('#grid').addEventListener('mouseover',info);
+$('#grid').addEventListener('mousemove',e=>{if(e.target.closest('.w'))tipMove(e)});
+$('#grid').addEventListener('mouseleave',()=>{$('#tip').hidden=true});
 $('#grid').addEventListener('click',info);
+document.addEventListener('click',e=>{if(!e.target.closest('#grid'))$('#tip').hidden=true});
 
 async function saveFile(name,blob){
   let d=null;
@@ -273,6 +305,16 @@ async function makeImage(){
   });
   x.globalAlpha=1;
   if(cur){x.strokeStyle='#8fb4ff';x.lineWidth=2.5;x.strokeRect(gx+cur[1]*pitch-2,top+cur[0]*pitch-2,sq+4,sq+4)}
+  const seen=new Set();x.font='600 15px '+SANS;x.textAlign='left';
+  EV.forEach((ev,k)=>{
+    if(seen.has(ev))return;seen.add(ev);
+    const n=ev.name.trim();if(!n)return;
+    const r=Math.floor(k/52),c=k%52,w=x.measureText(n).width+16,h=24;
+    const bx=Math.max(gx,Math.min(gx+c*pitch+sq/2-w/2,W-P-w)),by=top+r*pitch-h-3;
+    x.fillStyle='rgba(21,24,38,.92)';x.fillRect(bx,by,w,h);
+    x.fillStyle=ev.color;x.fillRect(bx,by,3,h);
+    x.fillStyle='#e8e6f2';x.fillText(n,bx+10,by+17);
+  });
   x.textAlign='left';
   x.fillStyle='#e8e6f2';x.font='700 64px '+SERIF;x.fillText('My life in weeks',P,112);
   x.fillStyle='#9096b3';x.font='26px '+SANS;
@@ -309,4 +351,3 @@ sync();
 </script>
 </body>
 </html>
- 

@@ -52,6 +52,8 @@ button:hover{border-color:var(--accent)}
 .lbl{position:absolute;left:0;top:0;z-index:2;pointer-events:none;white-space:nowrap;max-width:220px;overflow:hidden;text-overflow:ellipsis;font:600 11px/1.3 var(--sans);padding:1px 6px;background:rgba(21,24,38,.92);border-left:3px solid var(--accent);border-radius:3px;color:var(--text)}
 #tip{position:fixed;z-index:10;pointer-events:none;white-space:pre-line;max-width:260px;background:#0f1220;border:1px solid var(--line);border-radius:6px;padding:6px 10px;font-size:13px;line-height:1.4;box-shadow:0 4px 14px rgba(0,0,0,.45)}
 #tip[hidden]{display:none}
+.chk{display:flex;align-items:center;gap:8px;color:var(--text);font-size:14px;margin-bottom:12px;cursor:pointer}
+.chk input{flex:none;width:16px;height:16px;padding:0;accent-color:var(--accent)}
 </style>
 </head>
 <body>
@@ -80,6 +82,7 @@ button:hover{border-color:var(--accent)}
       </section>
       <section class="panel">
         <h2>Major events</h2>
+        <label class="chk"><input type="checkbox" id="showTitles" checked> Show event titles on the grid</label>
         <div id="events"></div>
         <button type="button" id="addEvent">Add event</button>
       </section>
@@ -122,6 +125,7 @@ function norm(o){
   if(!o||typeof o!=='object')throw new Error('bad file');
   const hex=c=>/^#[0-9a-f]{6}$/i.test(c)?c:PAL[0];
   return{version:1,
+    showTitles:o.showTitles!==false,
     birthDate:DRE.test(o.birthDate)?o.birthDate:'',
     years:Math.min(120,Math.max(1,parseInt(o.years)||90)),
     phases:(Array.isArray(o.phases)?o.phases:[]).map(p=>({name:String(p.name||'').slice(0,60),color:hex(p.color),mode:p.mode==='ages'?'ages':'dates',start:String(p.start??'').slice(0,10),end:String(p.end??'').slice(0,10)})),
@@ -185,7 +189,7 @@ function drawForm(){
       <div class="line"><input type="date" data-f="date" value="${esc(v.date)}" aria-label="Event date"><input type="number" data-f="weeks" value="${v.weeks||1}" min="1" max="520" step="1" style="flex:0 0 76px" aria-label="Weeks to mark"><span>weeks</span></div></div>`).join('')
     ||'<p class="empty">No events yet. Add a move, a graduation, a wedding.</p>';
 }
-function sync(){$('#birth').value=S.birthDate;$('#years').value=S.years;drawForm();drawGrid();save()}
+function sync(){$('#birth').value=S.birthDate;$('#years').value=S.years;$('#showTitles').checked=S.showTitles!==false;drawForm();drawGrid();save()}
 
 document.addEventListener('input',e=>{
   const f=e.target.dataset.f,it=e.target.closest('.item');
@@ -201,6 +205,7 @@ document.addEventListener('click',e=>{
 $('#addPhase').onclick=()=>{S.phases.push({name:'',color:PAL[S.phases.length%PAL.length],mode:'dates',start:'',end:''});drawForm();save()};
 $('#addEvent').onclick=()=>{S.events.push({name:'',color:PAL[(S.events.length+3)%PAL.length],date:'',weeks:1});drawForm();save()};
 $('#birth').oninput=e=>{S.birthDate=DRE.test(e.target.value)?e.target.value:'';drawGrid();save()};
+$('#showTitles').onchange=e=>{S.showTitles=e.target.checked;placeLabels();save()};
 $('#years').oninput=e=>{const n=parseInt(e.target.value);if(n>=1&&n<=120){S.years=n;drawGrid();save()}};
 
 function info(e){
@@ -226,6 +231,7 @@ function tipMove(e){
 }
 function placeLabels(){
   const g=$('#grid');g.querySelectorAll('.lbl').forEach(n=>n.remove());
+  if(S.showTitles===false)return;
   const gr=g.getBoundingClientRect(),seen=new Set();
   EV.forEach((ev,k)=>{
     if(seen.has(ev))return;seen.add(ev);
@@ -305,7 +311,7 @@ async function makeImage(){
   });
   x.globalAlpha=1;
   if(cur){x.strokeStyle='#8fb4ff';x.lineWidth=2.5;x.strokeRect(gx+cur[1]*pitch-2,top+cur[0]*pitch-2,sq+4,sq+4)}
-  const seen=new Set();x.font='600 15px '+SANS;x.textAlign='left';
+  const seen=new Set(S.showTitles===false?[...EV.values()]:[]);x.font='600 15px '+SANS;x.textAlign='left';
   EV.forEach((ev,k)=>{
     if(seen.has(ev))return;seen.add(ev);
     const n=ev.name.trim();if(!n)return;

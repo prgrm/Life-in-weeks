@@ -63,9 +63,13 @@ input:focus-visible, button:focus-visible{outline:3px solid var(--accent); outli
 .dow{font-size:.78rem; color:var(--muted); text-align:center; padding-bottom:6px}
 .day{
   height:36px; display:flex; align-items:center; justify-content:center;
-  font-size:.92rem; font-variant-numeric:tabular-nums;
+  font:inherit; font-size:.92rem; font-variant-numeric:tabular-nums;
+  color:var(--ink); background:none; border:0; padding:0; cursor:pointer;
 }
 .day span{width:32px; height:32px; border-radius:50%; display:grid; place-items:center}
+.day:hover span{background:var(--line)}
+.day:focus-visible{outline-offset:-3px}
+.hint{margin:0 2px 10px; font-size:.92rem; color:var(--muted)}
 .day.in{background:var(--band)}
 .day.in.l{border-top-left-radius:18px; border-bottom-left-radius:18px}
 .day.in.r{border-top-right-radius:18px; border-bottom-right-radius:18px}
@@ -103,6 +107,7 @@ input:focus-visible, button:focus-visible{outline:3px solid var(--accent); outli
   </section>
 
   <div id="out" aria-live="polite"></div>
+  <p class="hint">Click any day to make it the start date.</p>
   <div class="months" id="months"></div>
 </main>
 
@@ -110,6 +115,8 @@ input:focus-visible, button:focus-visible{outline:3px solid var(--accent); outli
 const $ = s => document.querySelector(s);
 const startEl = $('#start'), daysEl = $('#days'), out = $('#out'), monthsEl = $('#months');
 const chips = [...document.querySelectorAll('.chips button')];
+let anchor = null; // first month shown; stays put while you click days
+const firstOf = d => new Date(d.getFullYear(), d.getMonth(), 1);
 const DAY_MS = 86400000;
 const longDate = new Intl.DateTimeFormat(undefined, {month:'long', year:'numeric'});
 const wk = new Intl.DateTimeFormat(undefined, {weekday:'long'});
@@ -141,7 +148,8 @@ function render(){
     if(g === 0 || g === 6) weekend++;
   }
 
-  const sy = start.getFullYear(), sm = start.getMonth();
+  if(!anchor) anchor = firstOf(start);
+  const sy = anchor.getFullYear(), sm = anchor.getMonth();
   const viewEnd = new Date(sy, sm + 3, 0);
 
   out.innerHTML = `
@@ -176,7 +184,7 @@ function render(){
       if(isStart || isEnd) cls.push('mark');
       if(t === tToday) cls.push('today');
       const label = full.format(date) + (isStart ? ' (start)' : '') + (isEnd ? ' (end)' : '');
-      html += `<div class="${cls.join(' ')}" title="${label}" aria-label="${label}"><span>${d}</span></div>`;
+      html += `<button type="button" class="${cls.join(' ')}" data-date="${toISO(date)}" title="${label}" aria-label="${label}"><span>${d}</span></button>`;
     }
     html += '</div></section>';
   }
@@ -184,7 +192,19 @@ function render(){
 }
 
 chips.forEach(b => b.addEventListener('click', () => { daysEl.value = b.dataset.n; render(); }));
-startEl.addEventListener('input', render);
+startEl.addEventListener('input', () => {
+  if(startEl.value) anchor = firstOf(parse(startEl.value));
+  render();
+});
+monthsEl.addEventListener('click', e => {
+  const b = e.target.closest('.day');
+  if(!b) return;
+  const v = b.dataset.date;
+  startEl.value = v;
+  render();
+  const again = monthsEl.querySelector(`[data-date="${v}"]`);
+  if(again) again.focus({preventScroll:true});
+});
 daysEl.addEventListener('input', render);
 
 startEl.value = toISO(new Date());

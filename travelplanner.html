@@ -131,25 +131,24 @@ function render(){
   }
   const days = Math.min(n, 366);
   const start = parse(startEl.value);
-  const end = new Date(start.getFullYear(), start.getMonth(), start.getDate() + days - 1);
+  const end = new Date(start.getFullYear(), start.getMonth(), start.getDate() + days);
   const t0 = start.getTime(), t1 = end.getTime();
 
   // Weekend days inside the trip
   let weekend = 0;
-  for(let i = 0; i < days; i++){
+  for(let i = 0; i <= days; i++){
     const g = new Date(start.getFullYear(), start.getMonth(), start.getDate() + i).getDay();
     if(g === 0 || g === 6) weekend++;
   }
 
   const sy = start.getFullYear(), sm = start.getMonth();
   const viewEnd = new Date(sy, sm + 3, 0);
-  const nights = days - 1;
 
   out.innerHTML = `
     <section class="result" aria-label="Trip summary">
       <div class="start"><div class="k">Start</div><div class="big">${md.format(start)}</div><div class="sub">${wk.format(start)}, ${start.getFullYear()}</div></div>
       <div class="end"><div class="k">End</div><div class="big">${md.format(end)}</div><div class="sub">${wk.format(end)}, ${end.getFullYear()}</div></div>
-      <div><div class="k">Length</div><div class="big">${days} ${days === 1 ? 'day' : 'days'}</div><div class="sub">${nights} ${nights === 1 ? 'night' : 'nights'} · ${weekend} weekend ${weekend === 1 ? 'day' : 'days'}</div></div>
+      <div><div class="k">Length</div><div class="big">${days} ${days === 1 ? 'day' : 'days'}</div><div class="sub">${days + 1} calendar days · ${weekend} weekend ${weekend === 1 ? 'day' : 'days'}</div></div>
     </section>
     ${end > viewEnd ? '<p class="note">The trip runs past the three months shown below.</p>' : ''}`;
 

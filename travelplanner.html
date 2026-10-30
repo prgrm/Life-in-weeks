@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Travel dates</title>
+<style>
+:root{
+  --bg:#eef3f5; --card:#ffffff; --ink:#16262e; --muted:#5d7580; --line:#d6e1e6;
+  --accent:#0e5a78; --accent-ink:#ffffff; --band:#cde5ee; --today:#c46a1a;
+  color-scheme: light dark;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#10191e; --card:#18242b; --ink:#e6eef1; --muted:#93a9b3; --line:#2a3a43;
+    --accent:#5bc0e3; --accent-ink:#0b1a20; --band:#1f4454; --today:#f0a05a;
+  }
+}
+*{box-sizing:border-box}
+body{
+  margin:0; padding:28px 18px 48px; background:var(--bg); color:var(--ink);
+  font-family:"Avenir Next","Segoe UI",system-ui,-apple-system,sans-serif; line-height:1.4;
+}
+main{max-width:920px; margin:0 auto}
+h1{font-size:1.6rem; margin:0 0 18px; letter-spacing:-.01em}
+
+.controls{
+  display:flex; flex-wrap:wrap; gap:18px 28px; align-items:flex-end;
+  background:var(--card); border:1px solid var(--line); border-radius:14px; padding:18px;
+}
+.field{display:flex; flex-direction:column; gap:6px}
+.field > label{font-size:.9rem; color:var(--muted)}
+input[type=date], input[type=number]{
+  font:inherit; font-size:1.05rem; color:var(--ink); background:var(--bg);
+  border:1px solid var(--line); border-radius:8px; padding:9px 11px; min-width:0;
+}
+input[type=number]{width:96px}
+input:focus-visible, button:focus-visible{outline:3px solid var(--accent); outline-offset:2px}
+.chips{display:flex; gap:6px; flex-wrap:wrap}
+.chips button{
+  font:inherit; font-size:.9rem; color:var(--ink); background:transparent; cursor:pointer;
+  border:1px solid var(--line); border-radius:999px; padding:7px 13px;
+}
+.chips button.on{background:var(--accent); color:var(--accent-ink); border-color:var(--accent)}
+
+.result{
+  display:grid; grid-template-columns:1fr 1fr 1fr; margin:18px 0;
+  background:var(--card); border:1px solid var(--line); border-radius:14px; overflow:hidden;
+}
+.result > div{padding:16px 18px}
+.result > div + div{border-left:2px dashed var(--line)}
+.result .k{font-size:.9rem; color:var(--muted)}
+.result .big{font-size:2rem; font-weight:700; letter-spacing:-.02em; line-height:1.15; margin-top:2px}
+.result .sub{font-size:.95rem; color:var(--muted)}
+.result .start .big, .result .end .big{color:var(--accent)}
+.note{margin:-6px 2px 14px; font-size:.92rem; color:var(--today)}
+.err{margin:18px 2px; color:var(--muted)}
+
+.months{display:grid; grid-template-columns:repeat(auto-fit,minmax(250px,1fr)); gap:16px}
+.month{background:var(--card); border:1px solid var(--line); border-radius:14px; padding:16px 14px 12px}
+.month h2{font-size:1.05rem; margin:0 0 10px 4px}
+.grid{display:grid; grid-template-columns:repeat(7,1fr); row-gap:2px}
+.dow{font-size:.78rem; color:var(--muted); text-align:center; padding-bottom:6px}
+.day{
+  height:36px; display:flex; align-items:center; justify-content:center;
+  font-size:.92rem; font-variant-numeric:tabular-nums;
+}
+.day span{width:32px; height:32px; border-radius:50%; display:grid; place-items:center}
+.day.in{background:var(--band)}
+.day.in.l{border-top-left-radius:18px; border-bottom-left-radius:18px}
+.day.in.r{border-top-right-radius:18px; border-bottom-right-radius:18px}
+.day.mark span{background:var(--accent); color:var(--accent-ink); font-weight:700}
+.day.today:not(.mark) span{box-shadow:inset 0 0 0 2px var(--today)}
+
+@media (max-width:560px){
+  .result{grid-template-columns:1fr}
+  .result > div + div{border-left:0; border-top:2px dashed var(--line)}
+}
+</style>
+</head>
+<body>
+<main>
+  <h1>Travel dates</h1>
+
+  <section class="controls" aria-label="Trip settings">
+    <div class="field">
+      <label for="start">Start date</label>
+      <input type="date" id="start">
+    </div>
+    <div class="field">
+      <label for="days">Number of days</label>
+      <input type="number" id="days" min="1" max="366" value="7" inputmode="numeric">
+    </div>
+    <div class="field">
+      <label id="quick-label">Quick lengths</label>
+      <div class="chips" role="group" aria-labelledby="quick-label">
+        <button type="button" data-n="3">3 days</button>
+        <button type="button" data-n="7">7 days</button>
+        <button type="button" data-n="10">10 days</button>
+        <button type="button" data-n="14">14 days</button>
+      </div>
+    </div>
+  </section>
+
+  <div id="out" aria-live="polite"></div>
+  <div class="months" id="months"></div>
+</main>
+
+<script>
+const $ = s => document.querySelector(s);
+const startEl = $('#start'), daysEl = $('#days'), out = $('#out'), monthsEl = $('#months');
+const chips = [...document.querySelectorAll('.chips button')];
+const DAY_MS = 86400000;
+const longDate = new Intl.DateTimeFormat(undefined, {month:'long', year:'numeric'});
+const wk = new Intl.DateTimeFormat(undefined, {weekday:'long'});
+const md = new Intl.DateTimeFormat(undefined, {month:'short', day:'numeric'});
+const full = new Intl.DateTimeFormat(undefined, {weekday:'long', month:'long', day:'numeric', year:'numeric'});
+
+const pad = n => String(n).padStart(2, '0');
+const toISO = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+const parse = v => { const [y,m,d] = v.split('-').map(Number); return new Date(y, m-1, d); };
+
+function render(){
+  const n = parseInt(daysEl.value, 10);
+  chips.forEach(b => b.classList.toggle('on', +b.dataset.n === n));
+
+  if(!startEl.value || !(n >= 1)){
+    out.innerHTML = '<p class="err">Pick a start date and enter at least 1 day.</p>';
+    monthsEl.innerHTML = '';
+    return;
+  }
+  const days = Math.min(n, 366);
+  const start = parse(startEl.value);
+  const end = new Date(start.getFullYear(), start.getMonth(), start.getDate() + days - 1);
+  const t0 = start.getTime(), t1 = end.getTime();
+
+  // Weekend days inside the trip
+  let weekend = 0;
+  for(let i = 0; i < days; i++){
+    const g = new Date(start.getFullYear(), start.getMonth(), start.getDate() + i).getDay();
+    if(g === 0 || g === 6) weekend++;
+  }
+
+  const sy = start.getFullYear(), sm = start.getMonth();
+  const viewEnd = new Date(sy, sm + 3, 0);
+  const nights = days - 1;
+
+  out.innerHTML = `
+    <section class="result" aria-label="Trip summary">
+      <div class="start"><div class="k">Start</div><div class="big">${md.format(start)}</div><div class="sub">${wk.format(start)}, ${start.getFullYear()}</div></div>
+      <div class="end"><div class="k">End</div><div class="big">${md.format(end)}</div><div class="sub">${wk.format(end)}, ${end.getFullYear()}</div></div>
+      <div><div class="k">Length</div><div class="big">${days} ${days === 1 ? 'day' : 'days'}</div><div class="sub">${nights} ${nights === 1 ? 'night' : 'nights'} · ${weekend} weekend ${weekend === 1 ? 'day' : 'days'}</div></div>
+    </section>
+    ${end > viewEnd ? '<p class="note">The trip runs past the three months shown below.</p>' : ''}`;
+
+  const today = new Date(); today.setHours(0,0,0,0);
+  const tToday = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
+  const letters = ['S','M','T','W','T','F','S'];
+
+  let html = '';
+  for(let i = 0; i < 3; i++){
+    const first = new Date(sy, sm + i, 1);
+    const count = new Date(sy, sm + i + 1, 0).getDate();
+    html += `<section class="month" aria-label="${longDate.format(first)}"><h2>${longDate.format(first)}</h2><div class="grid">`;
+    html += letters.map(l => `<div class="dow" aria-hidden="true">${l}</div>`).join('');
+    html += '<div></div>'.repeat(first.getDay());
+    for(let d = 1; d <= count; d++){
+      const date = new Date(sy, sm + i, d);
+      const t = date.getTime(), dow = date.getDay();
+      const isStart = t === t0, isEnd = t === t1;
+      const cls = ['day'];
+      if(t >= t0 && t <= t1){
+        cls.push('in');
+        if(isStart || dow === 0 || d === 1) cls.push('l');
+        if(isEnd || dow === 6 || d === count) cls.push('r');
+      }
+      if(isStart || isEnd) cls.push('mark');
+      if(t === tToday) cls.push('today');
+      const label = full.format(date) + (isStart ? ' (start)' : '') + (isEnd ? ' (end)' : '');
+      html += `<div class="${cls.join(' ')}" title="${label}" aria-label="${label}"><span>${d}</span></div>`;
+    }
+    html += '</div></section>';
+  }
+  monthsEl.innerHTML = html;
+}
+
+chips.forEach(b => b.addEventListener('click', () => { daysEl.value = b.dataset.n; render(); }));
+startEl.addEventListener('input', render);
+daysEl.addEventListener('input', render);
+
+startEl.value = toISO(new Date());
+render();
+</script>
+</body>
+</html>

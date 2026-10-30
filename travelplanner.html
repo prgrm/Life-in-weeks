@@ -42,6 +42,9 @@ input:focus-visible, button:focus-visible{outline:3px solid var(--accent); outli
   border:1px solid var(--line); border-radius:999px; padding:7px 13px;
 }
 .chips button.on{background:var(--accent); color:var(--accent-ink); border-color:var(--accent)}
+.field.wide{flex-basis:100%}
+.chips.months{display:grid; grid-template-columns:repeat(6, minmax(0, 1fr)); max-width:440px}
+.chips.months button{padding:6px 0; font-size:.88rem}
 
 .result{
   display:grid; grid-template-columns:1fr 1fr 1fr; margin:18px 0;
@@ -102,7 +105,13 @@ input:focus-visible, button:focus-visible{outline:3px solid var(--accent); outli
         <button type="button" data-n="7">7 days</button>
         <button type="button" data-n="10">10 days</button>
         <button type="button" data-n="14">14 days</button>
+        <button type="button" data-n="59">59 days</button>
       </div>
+    </div>
+    <div class="field wide">
+      <label>First month shown</label>
+      <div class="chips" id="years" role="group" aria-label="Year"></div>
+      <div class="chips months" id="monthpick" role="group" aria-label="Month"></div>
     </div>
   </section>
 
@@ -117,6 +126,29 @@ const startEl = $('#start'), daysEl = $('#days'), out = $('#out'), monthsEl = $(
 const chips = [...document.querySelectorAll('.chips button')];
 let anchor = null; // first month shown; stays put while you click days
 const firstOf = d => new Date(d.getFullYear(), d.getMonth(), 1);
+
+// Year and month pickers: 5 years starting from last year, 12 months
+const yearsEl = $('#years'), monthPickEl = $('#monthpick');
+const thisYear = new Date().getFullYear();
+const monthShort = new Intl.DateTimeFormat(undefined, {month:'short'});
+for(let y = thisYear - 1; y <= thisYear + 3; y++){
+  yearsEl.insertAdjacentHTML('beforeend', `<button type="button" data-year="${y}">${y}</button>`);
+}
+for(let m = 0; m < 12; m++){
+  monthPickEl.insertAdjacentHTML('beforeend', `<button type="button" data-month="${m}">${monthShort.format(new Date(2000, m, 1))}</button>`);
+}
+yearsEl.addEventListener('click', e => {
+  const b = e.target.closest('button');
+  if(!b) return;
+  anchor = new Date(+b.dataset.year, anchor.getMonth(), 1);
+  render();
+});
+monthPickEl.addEventListener('click', e => {
+  const b = e.target.closest('button');
+  if(!b) return;
+  anchor = new Date(anchor.getFullYear(), +b.dataset.month, 1);
+  render();
+});
 const DAY_MS = 86400000;
 const longDate = new Intl.DateTimeFormat(undefined, {month:'long', year:'numeric'});
 const wk = new Intl.DateTimeFormat(undefined, {weekday:'long'});
@@ -129,7 +161,12 @@ const parse = v => { const [y,m,d] = v.split('-').map(Number); return new Date(y
 
 function render(){
   const n = parseInt(daysEl.value, 10);
-  chips.forEach(b => b.classList.toggle('on', +b.dataset.n === n));
+  const mark = (b, on) => { b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); };
+  chips.forEach(b => mark(b, +b.dataset.n === n));
+
+  if(!anchor) anchor = firstOf(startEl.value ? parse(startEl.value) : new Date());
+  yearsEl.querySelectorAll('button').forEach(b => mark(b, +b.dataset.year === anchor.getFullYear()));
+  monthPickEl.querySelectorAll('button').forEach(b => mark(b, +b.dataset.month === anchor.getMonth()));
 
   if(!startEl.value || !(n >= 1)){
     out.innerHTML = '<p class="err">Pick a start date and enter at least 1 day.</p>';
